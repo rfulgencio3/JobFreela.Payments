@@ -1,3 +1,4 @@
+using JobFreela.Payments.API.Consumer;
 using JobFreela.Payments.API.Services;
 using JobFreela.Payments.API.Services.Interfaces;
 
@@ -10,6 +11,8 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 builder.Services.AddScoped<IPaymentService, PaymentService>();
+
+builder.Services.AddHostedService<ProcessPaymentConsumer>();
 
 var app = builder.Build();
 
