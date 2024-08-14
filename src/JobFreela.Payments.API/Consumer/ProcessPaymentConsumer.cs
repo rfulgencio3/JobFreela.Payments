@@ -1,4 +1,5 @@
-﻿using JobFreela.Payments.API.Models.InputModels;
+﻿using JobFreela.Payments.API.Models.Events;
+using JobFreela.Payments.API.Models.InputModels;
 using JobFreela.Payments.API.Services.Interfaces;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -13,6 +14,7 @@ public class ProcessPaymentConsumer : BackgroundService
     private readonly IModel _channel;
     private readonly IServiceProvider _provider;
     private const string QUEUE_NAME = "payments";
+    private const string PAYMENT_APPROVED_QUEUE = "payments.approved";
     public ProcessPaymentConsumer(IServiceProvider provider)
     {
         _provider = provider;
@@ -31,6 +33,13 @@ public class ProcessPaymentConsumer : BackgroundService
             exclusive: false,
             autoDelete: false,
             arguments: null);
+
+        _channel.QueueDeclare(
+            queue: PAYMENT_APPROVED_QUEUE,
+            durable: false,
+            exclusive: false,
+            autoDelete: false,
+            arguments: null);
     }
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -43,6 +52,17 @@ public class ProcessPaymentConsumer : BackgroundService
             var paymentInfo = JsonSerializer.Deserialize<PaymentInfoInputModel>(paymentInfoJson);
 
             ProcessPayment(paymentInfo);
+
+            var paymentApproved = new PaymentApprovedIntegrationEvent(paymentInfo.IdProject);
+            var paymentApprovedJson = JsonSerializer.Serialize(paymentApproved);
+            var paymentApprovedBytes = Encoding.UTF8.GetBytes(paymentApprovedJson);
+
+            _channel.BasicPublish(
+                exchange: "",
+                routingKey: PAYMENT_APPROVED_QUEUE,
+                basicProperties: null,
+                body: paymentApprovedBytes
+                );
 
             _channel.BasicAck(eventArgs.DeliveryTag, false);
         };
